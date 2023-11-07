@@ -1,0 +1,33 @@
+# Load the data from its source.
+df = spark.read.load("/databricks-datasets/learning-spark-v2/people/people-10m.delta")
+
+#transform data 
+from pyspark.sql.functions import *
+df = df.withColumn("age",round(months_between(current_date(),col("birthDate"))/lit(12), 0)) 
+salary_df = df.groupby("age") \
+    .agg(round(avg("salary"), 0).alias("avg_salary"), \
+         median("salary").alias("med_salary") \
+     ) 
+
+# create connection
+
+#connection string found from Azure SQL settings
+url = "jdbc:sqlserver://haddonserver.database.windows.net:1433;database=databricks_test_sql;user=*****;password='*****"
+
+# define connection properties - this example uses a SQL username and login
+# install the latest MS SQL JAR file in the 'Libraries' of the cluster 
+connection_properties = {
+    "user": '******',
+    "password": '******',
+    "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+}
+
+
+# Write to the database 
+salary_df.write.mode("overwrite").jdbc(url=url, table = "Salary_Data", properties=connection_properties)
+
+#read data from database 
+store_df = spark.read.jdbc(url=url, table = "Salary_Data", properties=connection_properties)
+
+# Once data is read in from the database, you can run EDA using Spark. The data does not need to be queried from the source 
+
